@@ -35,9 +35,7 @@ extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i 
                            ex k = case lookup k os of
                                     Just (JSString (JSONString s)) -> s
                                     Just (JSRational False a) -> show (numerator a)
-                           t  = ex "text"
-                           c  = ex "created_at"
-                           i  = ex "id"
+                           [t,c,i]  = map ex ["text", "created_at", "id"]
                            
 readTwitterStream :: Int -> [JSValue] -> IO [JSValue]
 readTwitterStream page tweets = 
