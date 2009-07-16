@@ -12,18 +12,17 @@ import Data.List
 
 import qualified System.IO.UTF8 as UTF8
 
-data Tweet = Tweet { tweetText :: String, tweetCreatedAt :: String , tweetId :: String }
+data Tweet = Tweet { tweetText :: String, 
+                     tweetCreatedAt :: String , 
+                     tweetId :: String }
 
 twitterUser = "deeptijois"
 twitterUrl  = "http://twitter.com/"
 main = do
          tweetsJSON <- readTwitterStream 1 []
          
-         let tweets = map extractTweet tweetsJSON
-                                   
-             tweetsString =  map (\e ->  (tweetText e) ++ "\n" ++ 
-                                         (tweetCreatedAt e) ++ "\n" ++ 
-                                         twitterUrl ++ twitterUser ++ "/status/" ++ (tweetId e)) tweets
+         let tweets = map extractTweet tweetsJSON                                   
+             tweetsString =  map formatTweet tweets
          
          UTF8.writeFile "archive.txt"  (unlines $ intersperse "\n" tweetsString)
 
@@ -36,24 +35,38 @@ extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i 
                                     Just (JSString (JSONString s)) -> s
                                     Just (JSRational False a) -> show (numerator a)
                            [t,c,i]  = map ex ["text", "created_at", "id"]
-                           
+
+formatTweet :: Tweet -> String
+formatTweet tweet = unlines [ (tweetText tweet), 
+                              (tweetCreatedAt tweet),
+                              formatUrl (tweetId tweet)]
+                         where
+                           formatUrl statusId =  concat [twitterUrl,
+                                                         twitterUser,
+                                                         "/status/", 
+                                                         statusId]
+
 readTwitterStream :: Int -> [JSValue] -> IO [JSValue]
 readTwitterStream page tweets = 
     do 
-      let url = twitterUrl ++ "statuses/user_timeline/" ++ twitterUser ++ ".json?count=200&page=" ++  (show page)
-      case  (page < 21) of
-        True -> 
+      let url = concat [twitterUrl,
+                        "statuses/user_timeline/",
+                        twitterUser,
+                        ".json?count=200&page=",
+                        (show page)]
+      if  (page < 21)
+        then
             do
               tweetsJSONString <- (readContentsURL url)
               let tweetsJSON = case runGetJSON readJSArray tweetsJSONString of 
                                  Right (JSArray xs) -> xs
                                  _   -> []
               --print tweetsJSON
-              case (not (null tweetsJSON))  of
-                True -> readTwitterStream (page + 1) (tweets ++ tweetsJSON)
-                False -> return tweets
+              if (not (null tweetsJSON))
+                then readTwitterStream (page + 1) (tweets ++ tweetsJSON)
+                else return tweets
                 
-        False -> return tweets
+        else return tweets
 
 readContentsURL :: String -> IO String
 readContentsURL u = do
