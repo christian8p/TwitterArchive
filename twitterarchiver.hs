@@ -14,15 +14,20 @@ import qualified System.IO.UTF8 as UTF8
 
 data Tweet = Tweet { tweetText :: String, tweetCreatedAt :: String , tweetId :: String }
 
+twitterUser = "deeptijois"
+twitterUrl  = "http://twitter.com/"
 main = do
          tweetsJSON <- readTwitterStream 1 []
          
          let tweets = map extractTweet tweetsJSON
                                    
-             tweetsString =  map (\e ->  (tweetText e) ++ "\n" ++ (tweetCreatedAt e) ++ "\n" ++ (tweetId e)) tweets
+             tweetsString =  map (\e ->  (tweetText e) ++ "\n" ++ 
+                                         (tweetCreatedAt e) ++ "\n" ++ 
+                                         twitterUrl ++ twitterUser ++ "/status/" ++ (tweetId e)) tweets
          
          UTF8.writeFile "archive.txt"  (unlines $ intersperse "\n" tweetsString)
 
+extractTweet :: JSValue -> Tweet
 extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i  }
                          where
                            os = case tweetJSON of
@@ -37,7 +42,7 @@ extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i 
 readTwitterStream :: Int -> [JSValue] -> IO [JSValue]
 readTwitterStream page tweets = 
     do 
-      let url = "http://twitter.com/statuses/user_timeline/deeptijois.json?count=200&page=" ++  (show page)
+      let url = twitterUrl ++ "statuses/user_timeline/" ++ twitterUser ++ ".json?count=200&page=" ++  (show page)
       case  (page < 21) of
         True -> 
             do
