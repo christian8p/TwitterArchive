@@ -17,7 +17,7 @@ This guide assumes you have Haskell and Cabal installed on your computer
 
 * Execute the script using `runhaskell twitterarchiver.hs`
 
-* Once the script finishes execution, your twitter archive should be in a filed
+* Once the script finishes execution, your twitter archive should be in a file
   called `archive.txt`
 
 # Feedback
