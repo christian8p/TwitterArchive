@@ -11,7 +11,7 @@ to retrieve beyond 3200 past tweets..
 
 This guide assumes you have Haskell and Cabal installed on your computer
 
-* Install `json` from Cabal using `cabal install json`
+* Install `json` from Hackage using `cabal install json`
 
 * Modify the script on top to change the `twitterUser` property to your username
 
