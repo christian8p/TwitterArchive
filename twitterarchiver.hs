@@ -6,39 +6,46 @@ import Text.JSON
 import Text.JSON.Types
 import Text.JSON.String
 
+import Ratio
+
 import Data.List
 
 import qualified System.IO.UTF8 as UTF8
 
+data Tweet = Tweet { tweetText :: String, tweetCreatedAt :: String , tweetId :: String }
+
 main = do
-         tweets <- readTwitterStream 1 []
+         tweetsJSON <- readTwitterStream 1 []
          
-         let lookupTweetText x = case x of
-                                   (JSObject (JSONObject os)) -> 
-                                       case lookup "text" os of
-                                         Just (JSString (JSONString s)) -> s
-                                                                                                     
-             lookupTweetDate x = case x of
-                                   (JSObject (JSONObject os)) -> 
-                                       case lookup "created_at" os of 
-                                         Just (JSString (JSONString s)) -> s
+         let tweets = map extractTweet tweetsJSON
                                    
-             tweetsString =  map (\e ->  (lookupTweetDate e) ++ "\n" ++ (lookupTweetText e)) tweets
+             tweetsString =  map (\e ->  (tweetText e) ++ "\n" ++ (tweetCreatedAt e) ++ "\n" ++ (tweetId e)) tweets
          
          UTF8.writeFile "archive.txt"  (unlines $ intersperse "\n" tweetsString)
 
+extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i  }
+                         where
+                           os = case tweetJSON of
+                                  (JSObject (JSONObject o)) -> o
+                           ex k = case lookup k os of
+                                    Just (JSString (JSONString s)) -> s
+                                    Just (JSRational False a) -> show (numerator a)
+                           t  = ex "text"
+                           c  = ex "created_at"
+                           i  = ex "id"
+                           
 readTwitterStream :: Int -> [JSValue] -> IO [JSValue]
 readTwitterStream page tweets = 
     do 
-      let url = "http://twitter.com/statuses/user_timeline/nimbupani.json?count=200&page=" ++  (show page)
+      let url = "http://twitter.com/statuses/user_timeline/deeptijois.json?count=200&page=" ++  (show page)
       case  (page < 21) of
         True -> 
             do
-              print "Retrieving tweests, page " ++ (show page)
               tweetsJSONString <- (readContentsURL url)
               let tweetsJSON = case runGetJSON readJSArray tweetsJSONString of 
                                  Right (JSArray xs) -> xs
                                  _   -> []
+              --print tweetsJSON
               case (not (null tweetsJSON))  of
                 True -> readTwitterStream (page + 1) (tweets ++ tweetsJSON)
                 False -> return tweets
