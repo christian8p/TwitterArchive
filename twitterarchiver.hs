@@ -16,10 +16,11 @@ data Tweet = Tweet { tweetText :: String,
                      tweetCreatedAt :: String , 
                      tweetId :: String }
 
-twitterUser = "deeptijois"
+twitterUser = "vyom"
 twitterUrl  = "http://twitter.com/"
+
 main = do
-         tweetsJSON <- readTwitterStream 1 []
+         tweetsJSON <- readTwitterStream
          
          let tweets = map extractTweet tweetsJSON                                   
              tweetsString =  map formatTweet tweets
@@ -46,8 +47,10 @@ formatTweet tweet = unlines [ (tweetText tweet),
                                                          "/status/", 
                                                          statusId]
 
-readTwitterStream :: Int -> [JSValue] -> IO [JSValue]
-readTwitterStream page tweets = 
+readTwitterStream = readTwitterStream' 1 []
+
+readTwitterStream' :: Int -> [JSValue] -> IO [JSValue]
+readTwitterStream' page tweets = 
     do 
       let url = concat [twitterUrl,
                         "statuses/user_timeline/",
@@ -63,7 +66,7 @@ readTwitterStream page tweets =
                                  _   -> []
               --print tweetsJSON
               if (not (null tweetsJSON))
-                then readTwitterStream (page + 1) (tweets ++ tweetsJSON)
+                then readTwitterStream' (page + 1) (tweets ++ tweetsJSON)
                 else return tweets
                 
         else return tweets
