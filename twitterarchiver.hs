@@ -9,21 +9,62 @@ import Text.JSON.String
 import Ratio
 
 import Data.List
+import Data.Maybe ( fromMaybe )
+
+import System.Console.GetOpt
+import System
+import Control.Monad
+import IO
+import List
+import Char
 
 import qualified System.IO.UTF8 as UTF8
 
+-- data structure for tweet
 data Tweet = Tweet { tweetText :: String, 
                      tweetCreatedAt :: String , 
                      tweetId :: String }
 
-twitterUser = "vyom"
+-- data structure for twitter stream
+data TwitterStream = TwitterStream String [Tweet]
+
 twitterUrl  = "http://twitter.com/"
 
+data Options = Options { optUsername :: String } deriving Show
+
+defaultOptions = Options 
+  { optUsername = "vyom" }
+
+
+options :: [ OptDescr (Options -> IO Options) ]
+options = [ Option "h" ["help"]
+              (NoArg
+                 (\_ -> do
+    	            prg <- getProgName
+                    hPutStrLn stderr (usageInfo prg options)
+                    exitWith ExitSuccess))
+            "Show help"
+          , Option "u" ["username"]
+              (ReqArg
+                 (\arg opt -> return opt { optUsername = arg })
+                 "vyom")
+            "Twitter Username"
+          ]
+
 main = do
-         tweetsJSON <- readTwitterStream
+         args <- getArgs
+         -- Parse options, getting a list of option actions
+         let (actions, nonOptions, errors) = getOpt RequireOrder options args
+
+         -- Here we thread startOptions through all supplied option actions
+         opts <- foldl (>>=) (return defaultOptions) actions
          
-         let tweets = map extractTweet tweetsJSON                                   
-             tweetsString =  map formatTweet tweets
+         let Options { optUsername = username } = opts
+         tweetsJSON <- readTwitterStream username
+         
+         let tweets        = map extractTweet tweetsJSON                                   
+             twitterStream = TwitterStream username tweets 
+             tweetsString  =  formatTweets twitterStream
          
          UTF8.writeFile "archive.txt"  (unlines $ intersperse "\n" tweetsString)
 
@@ -37,24 +78,26 @@ extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i 
                                     Just (JSRational False a) -> show (numerator a)
                            [t,c,i]  = map ex ["text", "created_at", "id"]
 
-formatTweet :: Tweet -> String
-formatTweet tweet = unlines [ (tweetText tweet), 
-                              (tweetCreatedAt tweet),
-                              formatUrl (tweetId tweet)]
-                         where
-                           formatUrl statusId =  concat [twitterUrl,
-                                                         twitterUser,
-                                                         "/status/", 
-                                                         statusId]
+formatTweets :: TwitterStream -> [String]
+formatTweets twitterstream = map formatTweet tweets
+                             where
+                               TwitterStream username tweets = twitterstream
+                               formatUrl statusId =  concat [twitterUrl,
+                                                             username,
+                                                             "/status/", 
+                                                             statusId]
+                               formatTweet tweet = unlines [ (tweetText tweet), 
+                                                             (tweetCreatedAt tweet),
+                                                             formatUrl (tweetId tweet)]
 
-readTwitterStream = readTwitterStream' 1 []
+readTwitterStream username = readTwitterStream' username 1 []
 
-readTwitterStream' :: Int -> [JSValue] -> IO [JSValue]
-readTwitterStream' page tweets = 
+readTwitterStream' :: String -> Int -> [JSValue] -> IO [JSValue]
+readTwitterStream' username page tweets = 
     do 
       let url = concat [twitterUrl,
                         "statuses/user_timeline/",
-                        twitterUser,
+                        username,
                         ".json?count=200&page=",
                         (show page)]
       if  (page < 21)
@@ -66,7 +109,7 @@ readTwitterStream' page tweets =
                                  _   -> []
               --print tweetsJSON
               if (not (null tweetsJSON))
-                then readTwitterStream' (page + 1) (tweets ++ tweetsJSON)
+                then readTwitterStream' username (page + 1) (tweets ++ tweetsJSON)
                 else return tweets
                 
         else return tweets
