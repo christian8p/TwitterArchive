@@ -1,7 +1,7 @@
 # Introduction
 
 This script will access your publicly available Twitter stream and create a text
-file with all the past tweets.
+file with all the past tweets in JSON format.
 
 The Twitter API currently limits access to a maximum of 3200 tweets in your
 timeline. Hence if you have tweeted more often than that, you will not be able
@@ -17,7 +17,7 @@ The following instructions assume you have Haskell and Cabal installed on your c
   only public Twitter accounts are supported.
 
 * Once the script finishes execution, your twitter archive should be in a file
-  called `archive.txt`
+  called `archive.json`, stored in a simplified JSON format
 
 # Feedback
 

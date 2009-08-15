@@ -71,7 +71,7 @@ main = do
          
          let tweets        = map extractTweet tweetsJSON                                   
              tweetsString  =  render $  pp_value  $ showJSON tweets
-         UTF8.writeFile "archive.txt"  tweetsString
+         UTF8.writeFile "archive.json"  tweetsString
 
 extractTweet :: JSValue -> Tweet
 extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i  }
