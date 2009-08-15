@@ -37,10 +37,14 @@ instance JSON Tweet where
 
 twitterUrl  = "http://twitter.com/"
 
-data Options = Options { optUsername :: String } deriving Show
+data Options = Options { optUsername :: String,
+                         optFilename :: String 
+                       } deriving Show
 
 defaultOptions = Options 
-  { optUsername = "vyom" }
+  { optUsername = "vyom",
+    optFilename = "archive.json"
+  }
 
 
 options :: [ OptDescr (Options -> IO Options) ]
@@ -56,6 +60,11 @@ options = [ Option "h" ["help"]
                  (\arg opt -> return opt { optUsername = arg })
                  "vyom")
             "Twitter Username"
+          , Option "f" ["filename"]
+              (ReqArg
+                 (\arg opt -> return opt { optFilename = arg })
+                 "archive.json")
+            "Filename"
           ]
 
 main = do
@@ -65,13 +74,15 @@ main = do
 
          -- Here we thread startOptions through all supplied option actions
          opts <- foldl (>>=) (return defaultOptions) actions
-         let Options { optUsername = username } = opts
+         let Options { optUsername = username,
+                       optFilename = filename
+                     } = opts
 
          tweetsJSON <- readTwitterStream username
          
          let tweets        = map extractTweet tweetsJSON                                   
              tweetsString  =  render $  pp_value  $ showJSON tweets
-         UTF8.writeFile "archive.json"  tweetsString
+         UTF8.writeFile filename  tweetsString
 
 extractTweet :: JSValue -> Tweet
 extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i  }
