@@ -26,6 +26,7 @@ data Tweet = Tweet { tweetText :: String,
                      tweetCreatedAt :: String , 
                      tweetId :: Integer } deriving Show
 
+-- Making Tweet typeclass of JSON to enable decode/encode
 instance JSON Tweet where
     showJSON (Tweet tweetText tweetCreatedAt tweetId) = makeObj [
                                                                   ("text", JSString (JSONString tweetText)),
@@ -33,7 +34,16 @@ instance JSON Tweet where
                                                                   ("id", JSRational False 
                                                                                     (fromInteger tweetId))
                                                                 ]
-    readJSON tweet = Error "not yet implemented"
+    readJSON (JSObject (JSONObject os)) = Ok (Tweet { tweetText = t, tweetCreatedAt = c, tweetId = ((read i) :: Integer )  })
+        where
+          ex k = case lookup k os of
+                   Just (JSString (JSONString s)) -> s
+                   Just (JSRational False a) -> show (numerator a)
+          [t,c,i]  = map ex ["text", "created_at", "id"]
+
+-- helper functin to extract tweet out of result
+extractTweet :: Result Tweet -> Tweet 
+extractTweet (Ok t) = t
 
 twitterUrl  = "http://twitter.com/"
 
@@ -85,18 +95,13 @@ main = do
          -- Read Twitter Stream
          tweetsJSON <- readTwitterStream username pastTweets
          
-         let tweets        = map extractTweet tweetsJSON                                   
+         let extractT (Ok t) = t :: Tweet
+             tweets        = map (extractTweet . readJSON) tweetsJSON                                   
              tweetsString  =  render $  pp_value  $ showJSON tweets -- Encoding to JSON
+          
          -- Write encoded JSON to file
          UTF8.writeFile filename  tweetsString
 
-extractTweet :: JSValue -> Tweet
-extractTweet (JSObject (JSONObject os)) = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = ((read i) :: Integer )  }
-    where
-      ex k = case lookup k os of
-               Just (JSString (JSONString s)) -> s
-               Just (JSRational False a) -> show (numerator a)
-      [t,c,i]  = map ex ["text", "created_at", "id"]
 
 readJSONTweets :: String -> [JSValue]
 readJSONTweets tweetsJSONString = case runGetJSON readJSArray tweetsJSONString of
@@ -107,8 +112,7 @@ readTwitterStream username pastTweets = do
   if (not (null pastTweets))
      then
          do
-           let sinceid = maximum (map (tweetId . extractTweet)  pastTweets)           
-           --putStrLn (show sinceid)
+           let sinceid = maximum (map (tweetId . extractTweet . readJSON)  pastTweets)           
            latestTweets <- readTwitterStream' username 1 [] (Just sinceid)
            return (latestTweets ++ pastTweets)
      else 
@@ -127,7 +131,6 @@ readTwitterStream' username page tweets sinceid =
             do
               tweetsJSONString <- (readContentsURL fullUrl)
               let tweetsJSON = readJSONTweets tweetsJSONString
-              --print tweetsJSON
               if (not (null tweetsJSON))
                 then readTwitterStream' username (page + 1) (tweets ++ tweetsJSON) sinceid
                 else return tweets
