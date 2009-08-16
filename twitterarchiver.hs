@@ -91,14 +91,12 @@ main = do
          UTF8.writeFile filename  tweetsString
 
 extractTweet :: JSValue -> Tweet
-extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = ((read i) :: Integer )  }
-                         where
-                           os = case tweetJSON of
-                                  (JSObject (JSONObject o)) -> o
-                           ex k = case lookup k os of
-                                    Just (JSString (JSONString s)) -> s
-                                    Just (JSRational False a) -> show (numerator a)
-                           [t,c,i]  = map ex ["text", "created_at", "id"]
+extractTweet (JSObject (JSONObject os)) = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = ((read i) :: Integer )  }
+    where
+      ex k = case lookup k os of
+               Just (JSString (JSONString s)) -> s
+               Just (JSRational False a) -> show (numerator a)
+      [t,c,i]  = map ex ["text", "created_at", "id"]
 
 readJSONTweets :: String -> [JSValue]
 readJSONTweets tweetsJSONString = case runGetJSON readJSArray tweetsJSONString of
