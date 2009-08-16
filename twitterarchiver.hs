@@ -24,14 +24,14 @@ import qualified System.IO.UTF8 as UTF8
 -- data structure for tweet
 data Tweet = Tweet { tweetText :: String, 
                      tweetCreatedAt :: String , 
-                     tweetId :: String } deriving Show
+                     tweetId :: Integer } deriving Show
 
 instance JSON Tweet where
     showJSON (Tweet tweetText tweetCreatedAt tweetId) = makeObj [
                                                                   ("text", JSString (JSONString tweetText)),
                                                                   ("created_at", JSString (JSONString  tweetCreatedAt)), 
                                                                   ("id", JSRational False 
-                                                                                    (fromInteger (read tweetId :: Integer)))
+                                                                                    (fromInteger tweetId))
                                                                 ]
     readJSON tweet = Error "not yet implemented"
 
@@ -78,14 +78,20 @@ main = do
                        optFilename = filename
                      } = opts
 
-         tweetsJSON <- readTwitterStream username
+         -- Try reading past tweets
+         pastTweetsString <- readContentsArchiveFile filename
+         let pastTweets = readJSONTweets pastTweetsString
+
+         -- Read Twitter Stream
+         tweetsJSON <- readTwitterStream username pastTweets
          
          let tweets        = map extractTweet tweetsJSON                                   
-             tweetsString  =  render $  pp_value  $ showJSON tweets
+             tweetsString  =  render $  pp_value  $ showJSON tweets -- Encoding to JSON
+         -- Write encoded JSON to file
          UTF8.writeFile filename  tweetsString
 
 extractTweet :: JSValue -> Tweet
-extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i  }
+extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = ((read i) :: Integer )  }
                          where
                            os = case tweetJSON of
                                   (JSObject (JSONObject o)) -> o
@@ -94,29 +100,53 @@ extractTweet tweetJSON = Tweet { tweetText = t, tweetCreatedAt = c, tweetId = i 
                                     Just (JSRational False a) -> show (numerator a)
                            [t,c,i]  = map ex ["text", "created_at", "id"]
 
-readTwitterStream username = readTwitterStream' username 1 []
+readJSONTweets :: String -> [JSValue]
+readJSONTweets tweetsJSONString = case runGetJSON readJSArray tweetsJSONString of
+                              Right (JSArray xs) -> xs
+                              _                  -> []
 
-readTwitterStream' :: String -> Int -> [JSValue] -> IO [JSValue]
-readTwitterStream' username page tweets = 
+readTwitterStream username pastTweets = do
+  if (not (null pastTweets))
+     then
+         do
+           let sinceid = maximum (map (tweetId . extractTweet)  pastTweets)           
+           putStrLn (show sinceid)
+           latestTweets <- readTwitterStream' username 1 [] (Just sinceid)
+           return (latestTweets ++ pastTweets)
+     else 
+           readTwitterStream' username 1 [] Nothing 
+
+readTwitterStream' :: String -> Int -> [JSValue] -> Maybe Integer -> IO [JSValue]
+readTwitterStream' username page tweets sinceid = 
     do 
-      let url = concat [twitterUrl,
-                        "statuses/user_timeline/",
-                        username,
-                        ".json?count=200&page=",
-                        (show page)]
+      let url         = twitterUrl ++ "statuses/user_timeline/" ++ username ++ ".json"
+          querystring = case sinceid of 
+                          Nothing -> "count=200&page=" ++ (show page)
+                          Just tweetid ->  "count=200&page=" ++ (show page) ++ "&since_id=" ++ (show tweetid)
+          fullUrl = url ++ "?" ++ querystring                   
       if  (page < 21)
         then
             do
-              tweetsJSONString <- (readContentsURL url)
-              let tweetsJSON = case runGetJSON readJSArray tweetsJSONString of 
-                                 Right (JSArray xs) -> xs
-                                 _   -> []
+              tweetsJSONString <- (readContentsURL fullUrl)
+              let tweetsJSON = readJSONTweets tweetsJSONString
               --print tweetsJSON
               if (not (null tweetsJSON))
-                then readTwitterStream' username (page + 1) (tweets ++ tweetsJSON)
+                then readTwitterStream' username (page + 1) (tweets ++ tweetsJSON) sinceid
                 else return tweets
                 
         else return tweets
+
+readContentsArchiveFile :: String -> IO String
+readContentsArchiveFile f = do
+  result <- try (readFile f)
+  case result of
+    Right s -> do
+                putStrLn "Reading archive file"
+                return s
+                       
+    _       -> do
+                putStrLn "Could not read archive file"
+                return ""
 
 readContentsURL :: String -> IO String
 readContentsURL u = do
