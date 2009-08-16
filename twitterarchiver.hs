@@ -110,7 +110,7 @@ readTwitterStream username pastTweets = do
      then
          do
            let sinceid = maximum (map (tweetId . extractTweet)  pastTweets)           
-           putStrLn (show sinceid)
+           --putStrLn (show sinceid)
            latestTweets <- readTwitterStream' username 1 [] (Just sinceid)
            return (latestTweets ++ pastTweets)
      else 
