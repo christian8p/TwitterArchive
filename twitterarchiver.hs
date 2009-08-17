@@ -18,6 +18,7 @@ import Control.Monad
 import IO
 import List
 import Char
+import Control.Applicative
 
 import qualified System.IO.UTF8 as UTF8
 
@@ -96,9 +97,7 @@ main = do
 
          -- Read Twitter Stream
          tweetsJSON <- readTwitterStream username pastTweets
-         
-         let extractT (Ok t) = t :: Tweet
-             tweets        = map (extractTweet . readJSON) tweetsJSON                                   
+         let (Ok tweets) = mapM readJSON tweetsJSON :: Result [Tweet]                                    
              tweetsString  =  render $  pp_value  $ showJSON tweets -- Encoding to JSON
           
          -- Write encoded JSON to file
@@ -114,7 +113,8 @@ readTwitterStream username pastTweets = do
   if (not (null pastTweets))
      then
          do
-           let sinceid = maximum (map (tweetId . extractTweet . readJSON)  pastTweets)           
+           let (Ok tweetids) = mapM ((liftM tweetId) . readJSON)  pastTweets
+               sinceid = maximum tweetids
            latestTweets <- readTwitterStream' username 1 [] (Just sinceid)
            return (latestTweets ++ pastTweets)
      else 
@@ -124,9 +124,11 @@ readTwitterStream' :: String -> Int -> [JSValue] -> Maybe Integer -> IO [JSValue
 readTwitterStream' username page tweets sinceid = 
     do 
       let url         = twitterUrl ++ "statuses/user_timeline/" ++ username ++ ".json"
+          queryParams = [("count", "200"), ("page", show page)]
+          concatQueryStr params = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v) params    
           querystring = case sinceid of 
-                          Nothing -> "count=200&page=" ++ (show page)
-                          Just tweetid ->  "count=200&page=" ++ (show page) ++ "&since_id=" ++ (show tweetid)
+                          Nothing -> concatQueryStr queryParams
+                          Just tweetid ->  concatQueryStr $ queryParams ++ [("since_id", show tweetid)]
           fullUrl = url ++ "?" ++ querystring                   
       if  (page < 21)
         then
@@ -153,6 +155,7 @@ readContentsArchiveFile f = do
 
 readContentsURL :: String -> IO String
 readContentsURL u = do
+  putStrLn u
   req <- 
     case parseURI u of
       Nothing -> fail ("ill-formed URL: " ++ u)
