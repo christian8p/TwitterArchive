@@ -125,6 +125,7 @@ readTwitterStream' username page tweets sinceid =
       let url         = twitterUrl ++ "statuses/user_timeline/" ++ username ++ ".json"
           queryParams = [("count", "200"), ("page", show page)]
           concatQueryStr params = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v) params    
+          -- Add since_id to params if value exists
           querystring = case sinceid of 
                           Nothing -> concatQueryStr queryParams
                           Just tweetid ->  concatQueryStr $ queryParams ++ [("since_id", show tweetid)]
