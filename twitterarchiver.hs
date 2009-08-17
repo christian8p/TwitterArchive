@@ -112,7 +112,7 @@ readTwitterStream username pastTweets = do
   if (not (null pastTweets))
      then
          do
-           let (Ok tweetids) = mapM ((liftM tweetId) . readJSON)  pastTweets
+           let (Ok tweetids) = forM pastTweets $ (liftM tweetId) . readJSON
                sinceid = maximum tweetids
            latestTweets <- readTwitterStream' username 1 [] (Just sinceid)
            return (latestTweets ++ pastTweets)
