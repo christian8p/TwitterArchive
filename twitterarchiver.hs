@@ -21,32 +21,34 @@ import Char
 
 import qualified System.IO.UTF8 as UTF8
 
--- data structure for tweet
+-- Data structure for tweet
 data Tweet = Tweet { tweetText :: String, 
                      tweetCreatedAt :: String , 
                      tweetId :: Integer } deriving Show
 
 -- Making Tweet typeclass of JSON to enable decode/encode
 instance JSON Tweet where
-    showJSON (Tweet tweetText tweetCreatedAt tweetId) = makeObj [
-                                                                  ("text", JSString (JSONString tweetText)),
-                                                                  ("created_at", JSString (JSONString  tweetCreatedAt)), 
-                                                                  ("id", JSRational False 
-                                                                                    (fromInteger tweetId))
-                                                                ]
-    readJSON (JSObject (JSONObject os)) = Ok (Tweet { tweetText = t, tweetCreatedAt = c, tweetId = ((read i) :: Integer )  })
-        where
-          ex k = case lookup k os of
-                   Just (JSString (JSONString s)) -> s
-                   Just (JSRational False a) -> show (numerator a)
-          [t,c,i]  = map ex ["text", "created_at", "id"]
+    showJSON (Tweet tweetText tweetCreatedAt tweetId) = makeObj [ ("text", showJSON $ tweetText),
+                                                                  ("created_at", showJSON $ tweetCreatedAt), 
+                                                                  ("id", showJSON $ tweetId)]
 
--- helper functin to extract tweet out of result
-extractTweet :: Result Tweet -> Tweet 
-extractTweet (Ok t) = t
-
+    readJSON (JSObject obj) = let
+                        jsonObjAssoc = fromJSObject obj
+                    in do
+                      i <- mLookup "id"   jsonObjAssoc >>= readJSON
+                      t <- mLookup "text" jsonObjAssoc >>= readJSON
+                      c <- mLookup "created_at" jsonObjAssoc >>= readJSON
+                      return $ Tweet 
+                             { tweetText      = t,
+                               tweetCreatedAt = c,
+                               tweetId        = i
+                             }
+-- Misc          
+mLookup a as = maybe (fail $ "No such element: " ++ a) return (lookup a as)
+extractTweet (Ok t) = t :: Tweet
 twitterUrl  = "http://twitter.com/"
 
+-- Options Handling
 data Options = Options { optUsername :: String,
                          optFilename :: String 
                        } deriving Show
