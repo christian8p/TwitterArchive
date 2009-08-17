@@ -46,7 +46,6 @@ instance JSON Tweet where
                              }
 -- Misc          
 mLookup a as = maybe (fail $ "No such element: " ++ a) return (lookup a as)
-extractTweet (Ok t) = t :: Tweet
 twitterUrl  = "http://twitter.com/"
 
 -- Options Handling
