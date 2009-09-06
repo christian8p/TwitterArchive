@@ -15,8 +15,7 @@ The following instructions assume you have Haskell and Cabal installed on your c
 
 * Usage info is available by calling `runhaskell twitterarchiver.hs -h`
 
-* Execute the script using `runhaskell twitterarchiver.hs -u username`. For now
-  only public Twitter accounts are supported.
+* Execute the script using `runhaskell twitterarchiver.hs -u username`. 
 
 * Once the script finishes execution, your twitter archive should be in a file
   called `archive.json`, stored in a simplified JSON format. 
