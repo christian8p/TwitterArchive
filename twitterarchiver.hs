@@ -137,34 +137,37 @@ readContentsArchiveFile f = do
                putStrLn "Could not read archive file"
                return ""
 
+
 -- read contents of URL w/ optional HTTP auth
 readContentsURL u = do
  liftIO $ putStrLn u
+ 
  username <- asks tsUsername
  password <- asks tsPassword 
+ 
  -- don't like doing this, but HTTP is awfully chatty re: cookie handling..
  let nullHandler _ = return ()
  (_u, resp) <- liftIO $ browse $ do
       setOutHandler nullHandler
-      -- check if HTTP auth required
-      if password == Nothing
-        then return () -- do nothing
-        else do 
-              ioAction $ putStrLn "Using HTTP Auth"
-              let auth = AuthBasic {
-                     auUsername = username,
-                     auPassword = fromJust password,
-                     auRealm    = "",
-                     auSite      = fromJust $ (parseAbsoluteURI twitterUrl) }
-              -- add auth to request
-              addAuthority auth
-      -- make request
+      checkAuth username password
       (request $ getRequest u)
+ 
  case rspCode resp of
    (2,_,_) -> return (rspBody resp)
    _ -> fail ("Failed reading URL " ++ show u ++ " code: " ++ show (rspCode resp))
 
-
+-- checks if password is provided and sets HTTP auth for request
+checkAuth username password 
+   | password == Nothing = return ()
+   | otherwise = do 
+        ioAction $ putStrLn "Using HTTP Auth"
+        addAuthority auth -- add auth to request
+         where auth = AuthBasic {
+                auUsername = username,
+                auPassword = fromJust password,
+                auRealm    = "",
+                auSite      = fromJust $ (parseAbsoluteURI twitterUrl) }
+         
 main = do
          args <- getArgs
          -- Parse options, getting a list of option actions
