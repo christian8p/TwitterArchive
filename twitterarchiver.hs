@@ -14,6 +14,8 @@ import System
 import List
 import Char
 
+import Data.Maybe
+
 import IO
 import Control.Monad
 import Control.Applicative
@@ -135,13 +137,9 @@ readContentsArchiveFile f = do
 
 readContentsURL u = do
  putStrLn u
- req <- 
-   case parseURI u of
-     Nothing -> fail ("ill-formed URL: " ++ u)
-     Just ur -> return (defaultGETRequest ur)
-   -- don't like doing this, but HTTP is awfully chatty re: cookie handling..
+ -- don't like doing this, but HTTP is awfully chatty re: cookie handling..
  let nullHandler _ = return ()
- (_u, resp) <- browse $ setOutHandler nullHandler >> request req
+ (_u, resp) <- browse $ setOutHandler nullHandler >> (request $ getRequest u)
  case rspCode resp of
    (2,_,_) -> return (rspBody resp)
    _ -> fail ("Failed reading URL " ++ show u ++ " code: " ++ show (rspCode resp))
