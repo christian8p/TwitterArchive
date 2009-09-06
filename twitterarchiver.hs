@@ -92,28 +92,27 @@ readJSONTweets tweetsJSONString = case runGetJSON readJSArray tweetsJSONString o
                              Right (JSArray xs) -> xs
                              _                  -> []
 
-readTwitterStream = do
-  sinceId  <- asks sinceId
-  username <- asks twitterUsername
-  liftIO $ readTwitterStream' username 1 [] sinceId
+readTwitterStream = readTwitterStream' 1 [] 
 
-readTwitterStream' username page tweets sinceid
+readTwitterStream' page tweets
                         | page >= 21 = return tweets
                         | otherwise  = do
-                                          tweetsJSONString <- (readContentsURL fullUrl)
+                                          sinceId  <- asks sinceId
+                                          username <- asks twitterUsername                          
+                                          tweetsJSONString <- liftIO $ readContentsURL (fullUrl username sinceId)
                                           let tweetsJSON = readJSONTweets tweetsJSONString
                                           if (not (null tweetsJSON))
-                                            then readTwitterStream' username (page + 1) (tweets ++ tweetsJSON) sinceid
+                                            then readTwitterStream' (page + 1) (tweets ++ tweetsJSON)
                                             else return tweets
 
-                                       where url         = twitterUrl ++ "statuses/user_timeline/" ++ username ++ ".json"
-                                             queryParams = [("count", "200"), ("page", show page)]
+                                       where url username          = twitterUrl ++ "statuses/user_timeline/" ++ username ++ ".json"
+                                             queryParams           = [("count", "200"), ("page", show page)]
                                              concatQueryStr params = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v) params    
                                              -- Add since_id to params if value exists
-                                             querystring = case sinceid of 
-                                                             Nothing -> concatQueryStr queryParams
-                                                             Just tweetid ->  concatQueryStr $ queryParams ++ [("since_id", show tweetid)]
-                                             fullUrl = url ++ "?" ++ querystring                   
+                                             querystring sinceId   = case sinceId of 
+                                                                       Nothing -> concatQueryStr queryParams
+                                                                       Just tweetId ->  concatQueryStr $ queryParams ++ [("since_id", show tweetId)]
+                                             fullUrl username sinceId = (url username) ++ "?" ++ (querystring sinceId)
 
 readContentsArchiveFile f = do
  result <- try (readFile f)
