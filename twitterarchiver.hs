@@ -23,26 +23,21 @@ import Control.Monad.Reader
 
 import qualified System.IO.UTF8 as UTF8
 
--- Data structure for tweet
-data Tweet = Tweet { tweetText :: String, 
-                     tweetCreatedAt :: String , 
-                     tweetId :: Integer } deriving Show
+-- Data
+data Tweet = Tweet { 
+  tweetText      :: String, 
+  tweetCreatedAt :: String , 
+  tweetId        :: Integer } deriving Show
 
-data Options = Options { optUsername :: String,
-                         optFilename :: String,
-                         optPassword :: Maybe String
-                      } deriving Show
-
-defaultOptions = Options 
- { optUsername = "vyom",
-   optFilename = "archive.json",
-   optPassword = Nothing
- }
+data Options = Options { 
+  optUsername :: String,
+  optFilename :: String,
+  optPassword :: Maybe String } deriving Show
 
 data TwitterSettings = TS {
-   twitterUsername :: String,
-   sinceId         :: Maybe Integer,
-   tsPassword      :: Maybe String
+   tsUsername :: String,
+   tsSinceId  :: Maybe Integer,
+   tsPassword :: Maybe String
 }
 
 -- Making Tweet typeclass of JSON to enable decode/encode
@@ -68,6 +63,11 @@ mLookup a as = maybe (fail $ "No such element: " ++ a) return (lookup a as)
 twitterUrl  = "http://twitter.com/"
 
 -- Options Handling
+defaultOptions = Options { 
+   optUsername = "vyom",
+   optFilename = "archive.json",
+   optPassword = Nothing }
+
 options = [ Option "h" ["help"]
               (NoArg
                  (\_ -> do
@@ -93,38 +93,39 @@ options = [ Option "h" ["help"]
             
           ]
 
+-- calculate latest id for since_id param
 calculateSinceId pastTweets = if (not (null pastTweets))
                                 then
                                   let (Ok tweetids) = forM pastTweets $ (liftM tweetId) . readJSON
                                   in Just (maximum tweetids)
                                 else Nothing
 
+-- extract array of JSON values from a string
 readJSONTweets tweetsJSONString = case runGetJSON readJSArray tweetsJSONString of
                              Right (JSArray xs) -> xs
                              _                  -> []
 
+-- read twitter stream
 readTwitterStream = readTwitterStream' 1 [] 
 
+-- read twitter stream page by page
 readTwitterStream' page tweets
-                        | page >= 21 = return tweets
-                        | otherwise  = do
-                                          sinceId  <- asks sinceId
-                                          username <- asks twitterUsername                          
-                                          tweetsJSONString <- readContentsURL (fullUrl username sinceId)
-                                          let tweetsJSON = readJSONTweets tweetsJSONString
-                                          if (not (null tweetsJSON))
-                                            then readTwitterStream' (page + 1) (tweets ++ tweetsJSON)
-                                            else return tweets
+    | page >= 21 = return tweets
+    | otherwise  = do
+                      sinceId  <- asks tsSinceId
+                      username <- asks tsUsername                          
+                      tweetsJSON <- readJSONTweets <$> readContentsURL (fullUrl username sinceId)
+                      if (not (null tweetsJSON))
+                        then readTwitterStream' (page + 1) (tweets ++ tweetsJSON)
+                        else return tweets
+                   where url username          = twitterUrl ++ "statuses/user_timeline/" ++ username ++ ".json"
+                         queryParams           = [("count", "200"), ("page", show page)]
+                         concatQueryStr params = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v) params
+                         querystring Nothing        =  concatQueryStr queryParams
+                         querystring (Just tweetId) =  concatQueryStr $ queryParams ++ [("since_id", show tweetId)]
+                         fullUrl username sinceId = (url username) ++ "?" ++ (querystring sinceId)
 
-                                       where url username          = twitterUrl ++ "statuses/user_timeline/" ++ username ++ ".json"
-                                             queryParams           = [("count", "200"), ("page", show page)]
-                                             concatQueryStr params = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v) params    
-                                             -- Add since_id to params if value exists
-                                             querystring sinceId   = case sinceId of 
-                                                                       Nothing -> concatQueryStr queryParams
-                                                                       Just tweetId ->  concatQueryStr $ queryParams ++ [("since_id", show tweetId)]
-                                             fullUrl username sinceId = (url username) ++ "?" ++ (querystring sinceId)
-
+-- read JSON contents of an archive file on disk
 readContentsArchiveFile f = do
  result <- try (readFile f)
  case result of
@@ -136,26 +137,29 @@ readContentsArchiveFile f = do
                putStrLn "Could not read archive file"
                return ""
 
+-- read contents of URL w/ optional HTTP auth
 readContentsURL u = do
  liftIO $ putStrLn u
- username <- asks twitterUsername
+ username <- asks tsUsername
  password <- asks tsPassword 
  -- don't like doing this, but HTTP is awfully chatty re: cookie handling..
  let nullHandler _ = return ()
  (_u, resp) <- liftIO $ browse $ do
-                                  setOutHandler nullHandler
-                                  if password == Nothing
-                                    then return () -- do nothing
-                                    else do -- add auth
-                                          ioAction $ putStrLn "Using HTTP Auth"
-                                          let auth = AuthBasic {
-                                                 auUsername = username,
-                                                 auPassword = fromJust password,
-                                                 auRealm    = "",
-                                                 auSite      = fromJust $ (parseAbsoluteURI twitterUrl)
-                                             }
-                                          addAuthority auth
-                                  (request $ getRequest u)
+      setOutHandler nullHandler
+      -- check if HTTP auth required
+      if password == Nothing
+        then return () -- do nothing
+        else do 
+              ioAction $ putStrLn "Using HTTP Auth"
+              let auth = AuthBasic {
+                     auUsername = username,
+                     auPassword = fromJust password,
+                     auRealm    = "",
+                     auSite      = fromJust $ (parseAbsoluteURI twitterUrl) }
+              -- add auth to request
+              addAuthority auth
+      -- make request
+      (request $ getRequest u)
  case rspCode resp of
    (2,_,_) -> return (rspBody resp)
    _ -> fail ("Failed reading URL " ++ show u ++ " code: " ++ show (rspCode resp))
@@ -173,15 +177,19 @@ main = do
                        optPassword = password
                      } = opts                     
          
-         -- Try reading past tweets
+         -- Read past tweets (if any)
          pastTweets <- readJSONTweets <$> (readContentsArchiveFile filename)
          
-         let settings = TS { twitterUsername = username,
-                             sinceId         = calculateSinceId pastTweets,
-                             tsPassword      = password
-                           }
+         -- init settings
+         let settings = TS { tsUsername = username,
+                             tsSinceId  = calculateSinceId pastTweets,
+                             tsPassword = password }
+                             
+         -- fetch latest tweets                     
          latestTweets <- runReaderT readTwitterStream settings
-         let allTweetsJSON   = latestTweets ++ pastTweets
+         
+         -- format tweets into string
+         let allTweetsJSON   = latestTweets ++ pastTweets -- combine past and latest tweets
              (Ok tweets)     = mapM readJSON allTweetsJSON :: Result [Tweet]                                    
              tweetsString    =  render $  pp_value  $ showJSON tweets -- Encoding to JSON
          
