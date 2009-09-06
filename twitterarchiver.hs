@@ -41,7 +41,8 @@ defaultOptions = Options
 
 data TwitterSettings = TS {
    twitterUsername :: String,
-   sinceId         :: Maybe Integer    
+   sinceId         :: Maybe Integer,
+   tsPassword      :: Maybe String
 }
 
 -- Making Tweet typeclass of JSON to enable decode/encode
@@ -109,7 +110,7 @@ readTwitterStream' page tweets
                         | otherwise  = do
                                           sinceId  <- asks sinceId
                                           username <- asks twitterUsername                          
-                                          tweetsJSONString <- liftIO $ readContentsURL (fullUrl username sinceId)
+                                          tweetsJSONString <- readContentsURL (fullUrl username sinceId)
                                           let tweetsJSON = readJSONTweets tweetsJSONString
                                           if (not (null tweetsJSON))
                                             then readTwitterStream' (page + 1) (tweets ++ tweetsJSON)
@@ -136,10 +137,25 @@ readContentsArchiveFile f = do
                return ""
 
 readContentsURL u = do
- putStrLn u
+ liftIO $ putStrLn u
+ username <- asks twitterUsername
+ password <- asks tsPassword 
  -- don't like doing this, but HTTP is awfully chatty re: cookie handling..
  let nullHandler _ = return ()
- (_u, resp) <- browse $ setOutHandler nullHandler >> (request $ getRequest u)
+ (_u, resp) <- liftIO $ browse $ do
+                                  setOutHandler nullHandler
+                                  if password == Nothing
+                                    then return () -- do nothing
+                                    else do -- add auth
+                                          ioAction $ putStrLn "Using HTTP Auth"
+                                          let auth = AuthBasic {
+                                                 auUsername = username,
+                                                 auPassword = fromJust password,
+                                                 auRealm    = "",
+                                                 auSite      = fromJust $ (parseAbsoluteURI twitterUrl)
+                                             }
+                                          addAuthority auth
+                                  (request $ getRequest u)
  case rspCode resp of
    (2,_,_) -> return (rspBody resp)
    _ -> fail ("Failed reading URL " ++ show u ++ " code: " ++ show (rspCode resp))
@@ -153,14 +169,16 @@ main = do
          -- Here we thread startOptions through all supplied option actions
          opts <- foldl (>>=) (return defaultOptions) actions
          let Options { optUsername = username,
-                       optFilename = filename
+                       optFilename = filename,
+                       optPassword = password
                      } = opts                     
          
          -- Try reading past tweets
          pastTweets <- readJSONTweets <$> (readContentsArchiveFile filename)
          
          let settings = TS { twitterUsername = username,
-                             sinceId         = calculateSinceId pastTweets
+                             sinceId         = calculateSinceId pastTweets,
+                             tsPassword      = password
                            }
          latestTweets <- runReaderT readTwitterStream settings
          let allTweetsJSON   = latestTweets ++ pastTweets
