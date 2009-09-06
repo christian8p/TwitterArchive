@@ -27,12 +27,14 @@ data Tweet = Tweet { tweetText :: String,
                      tweetId :: Integer } deriving Show
 
 data Options = Options { optUsername :: String,
-                        optFilename :: String 
+                         optFilename :: String,
+                         optPassword :: Maybe String
                       } deriving Show
 
 defaultOptions = Options 
  { optUsername = "vyom",
-   optFilename = "archive.json"
+   optFilename = "archive.json",
+   optPassword = Nothing
  }
 
 data TwitterSettings = TS {
@@ -80,6 +82,12 @@ options = [ Option "h" ["help"]
                  (\arg opt -> return opt { optFilename = arg })
                  "archive.json")
             "Filename"
+          , Option "p" ["password"]
+              (ReqArg
+                 (\arg opt -> return opt { optPassword = Just arg })
+                 "password")
+            "Password"
+            
           ]
 
 calculateSinceId pastTweets = if (not (null pastTweets))
