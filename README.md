@@ -30,11 +30,12 @@ account `vyom` to a file called `vyom.json`
 
     runhaskell twitterarchiver.hs -u vyom -f vyom.json
 
-If you have a private stream, you can add the password as a commandline
-argument after `-p` like below. The script will then automatically use HTTP
-Basic authentication when calling the Twitter API.
+If you have a private stream, you can call the script with a `-p` argument and
+you will be prompted for a password. The script will then automatically use
+HTTP Basic authentication when calling the Twitter API.
 
-    runhaskell twitterarchiver.hs -u divya -f divya.json -p 'secret'        
+    runhaskell twitterarchiver.hs -u divya -f divya.json -p
+    Enter Twitter Password :
 
 # Feedback
 

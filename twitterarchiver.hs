@@ -16,6 +16,7 @@ import Char
 
 import Data.Maybe
 
+import System.IO
 import IO
 import Control.Monad
 import Control.Applicative
@@ -86,11 +87,16 @@ options = [ Option "h" ["help"]
                  "archive.json")
             "Filename"
           , Option "p" ["password"]
-              (ReqArg
-                 (\arg opt -> return opt { optPassword = Just arg })
-                 "password")
-            "Password"
-            
+              (NoArg
+                 (\opt -> do
+                            putStr "Enter Twitter Password : "
+                            hFlush stdout
+                            hSetEcho stdout False                            
+                            password <- hGetLine stdin
+                            hSetEcho stdout True
+                            putStr "\n"
+                            return opt { optPassword = Just password }))
+            "ask for password (private Twitter stream)"            
           ]
 
 -- calculate latest id for since_id param
