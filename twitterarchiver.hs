@@ -43,9 +43,9 @@ data TwitterSettings = TS {
 
 -- Making Tweet typeclass of JSON to enable decode/encode
 instance JSON Tweet where
-   showJSON (Tweet tweetText tweetCreatedAt tweetId) = makeObj [ ("text", showJSON $ tweetText),
-                                                                 ("created_at", showJSON $ tweetCreatedAt), 
-                                                                 ("id", showJSON $ tweetId)]
+   showJSON (Tweet tweetText tweetCreatedAt tweetId) = makeObj [ ("text", showJSON tweetText),
+                                                                 ("created_at", showJSON tweetCreatedAt), 
+                                                                 ("id", showJSON tweetId)]
 
    readJSON (JSObject obj) = let
                        jsonObjAssoc = fromJSObject obj
@@ -53,14 +53,14 @@ instance JSON Tweet where
                      i <- mLookup "id"   jsonObjAssoc >>= readJSON
                      t <- mLookup "text" jsonObjAssoc >>= readJSON
                      c <- mLookup "created_at" jsonObjAssoc >>= readJSON
-                     return $ Tweet 
+                     return Tweet 
                             { tweetText      = t,
                               tweetCreatedAt = c,
                               tweetId        = i
                             }
 
 -- Misc          
-mLookup a as = maybe (fail $ "No such element: " ++ a) return (lookup a as)
+mLookup a = maybe (fail $ "No such element: " ++ a) return . lookup a
 twitterUrl  = "http://twitter.com/"
 
 -- Options Handling
@@ -100,9 +100,9 @@ options = [ Option "h" ["help"]
           ]
 
 -- calculate latest id for since_id param
-calculateSinceId pastTweets = if (not (null pastTweets))
+calculateSinceId pastTweets = if not (null pastTweets)
                                 then
-                                  let (Ok tweetids) = forM pastTweets $ (liftM tweetId) . readJSON
+                                  let (Ok tweetids) = forM pastTweets $ liftM tweetId . readJSON
                                   in Just (maximum tweetids)
                                 else Nothing
 
@@ -121,7 +121,7 @@ readTwitterStream' page tweets
                       sinceId  <- asks tsSinceId
                       username <- asks tsUsername                          
                       tweetsJSON <- readJSONTweets <$> readContentsURL (fullUrl username sinceId)
-                      if (not (null tweetsJSON))
+                      if not (null tweetsJSON)
                         then readTwitterStream' (page + 1) (tweets ++ tweetsJSON)
                         else return tweets
                    where url username          = twitterUrl ++ "statuses/user_timeline/" ++ username ++ ".json"
@@ -129,7 +129,7 @@ readTwitterStream' page tweets
                          concatQueryStr params = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v) params
                          querystring Nothing        =  concatQueryStr queryParams
                          querystring (Just tweetId) =  concatQueryStr $ queryParams ++ [("since_id", show tweetId)]
-                         fullUrl username sinceId = (url username) ++ "?" ++ (querystring sinceId)
+                         fullUrl username sinceId = url username ++ "?" ++ querystring sinceId
 
 -- read JSON contents of an archive file on disk
 readContentsArchiveFile f = do
@@ -172,7 +172,7 @@ checkAuth username password
                 auUsername = username,
                 auPassword = fromJust password,
                 auRealm    = "",
-                auSite      = fromJust $ (parseAbsoluteURI twitterUrl) }
+                auSite      = fromJust $ parseAbsoluteURI twitterUrl }
          
 main = do
          args <- getArgs
@@ -187,7 +187,7 @@ main = do
                      } = opts                     
          
          -- Read past tweets (if any)
-         pastTweets <- readJSONTweets <$> (readContentsArchiveFile filename)
+         pastTweets <- readJSONTweets <$> readContentsArchiveFile filename
          
          -- init settings
          let settings = TS { tsUsername = username,
