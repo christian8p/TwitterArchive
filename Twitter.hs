@@ -54,7 +54,7 @@ readTwitterStream page tweets
 
                          queryParams           = [("count", "200"), ("page", show page)]
 
-                         concatQueryStr params = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v) params
+                         concatQueryStr = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v)
 
                          querystring Nothing        =  concatQueryStr queryParams
                          querystring (Just tweetId) =  concatQueryStr $ queryParams ++ [("since_id", show tweetId)]
@@ -94,6 +94,6 @@ getRecentTweets = readTwitterStream 1 []
 -- write Tweets to file
 writeTweetsToFile filename tweetsJSON = let (Ok tweets) = mapM readJSONTweet tweetsJSON
                                             readJSONTweet :: JSValue -> Result Tweet
-                                            readJSONTweet tweet = readJSON tweet
+                                            readJSONTweet = readJSON
                                             tweetsString    =  render $  pp_value  $ showJSON tweets -- Encoding to JSON
-                                        in do writeToFile filename tweetsString
+                                        in writeToFile filename tweetsString
