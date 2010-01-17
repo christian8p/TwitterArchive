@@ -54,7 +54,7 @@ readTwitterStream page tweets
 
                          queryParams           = [("count", "200"), ("page", show page)]
 
-                         concatQueryStr = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v)
+                         concatQueryStr params = intercalate "&" $ map (\(k,v) -> k ++ "=" ++ v) params
 
                          querystring Nothing        =  concatQueryStr queryParams
                          querystring (Just tweetId) =  concatQueryStr $ queryParams ++ [("since_id", show tweetId)]
