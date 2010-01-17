@@ -1,3 +1,4 @@
 # TODO List
 
-* Put the code in a proper module
+* Cabal module
+* HTTP Auth seems to be broken
